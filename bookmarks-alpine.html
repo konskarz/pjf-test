@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zxx">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Bookmarks Alpine</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css" />
+	<style>
+	</style>
+</head>
+<body>
+	<div x-data="bookmarks" class="container vh-100 d-flex flex-column">
+		<div class="py-4 row flex-shrink-0">
+			<h2 class="h3 font-weight-light mb-0 pt-3 col-sm-4 col-md-7">Bookmarks</h2>
+			<form @submit.prevent="search" class="col pt-3 input-group">
+				<select x-model="tag" class="form-control">
+					<option value="">All</option>
+					<template x-for="(tag, index) in tags" :key="index">
+						<option :value="tag" x-text="tag"></option>
+					</template>
+				</select>
+				<input x-model="query" type="search" class="form-control" placeholder="Search">
+				<select x-model="site" @change="search" class="form-control">
+					<option value="">Google</option>
+					<template x-for="site in sites" :key="site.id">
+						<option :value="site.url" x-text="site.name"></option>
+					</template>
+				</select>
+			</form>
+		</div>
+		<div class="section-content pb-4 row flex-nowrap overflow-auto">
+			<div class="nav flex-column col-10 col-md-7 px-0">
+				<template x-for="bookmark in filtered" :key="bookmark.id">
+					<a :href="bookmark.url" x-text="bookmark.name"
+						class="nav-link w-100 text-truncate" rel="external"></a>
+				</template>
+			</div>
+		</div>
+	</div>
+	<script type="module">
+		import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.10.3/dist/module.esm.js';
+		Alpine.data('bookmarks', () => ({
+			defaults: {
+				'path': '/Bookmarks',
+				'data': {
+					'main': 'roots.other',
+					'search': 'Search',
+					'children': 'children',
+					'name': 'name',
+					'url': 'url',
+					'sort': 'date_added'
+				},
+				'site': 'https://google.com/search?q='
+			},
+			bookmarks: [],
+			tags: [],
+			sites: [],
+			query: '',
+			tag: '',
+			site: '',
+			get filtered() {
+				let filtered = this.bookmarks;
+				if(this.tag) filtered = filtered.filter(bookmark => bookmark.tag === this.tag);
+				if(this.query) this.query.toLowerCase().split(/\s|\+/g).forEach(
+					word => filtered = filtered.filter(bookmark => bookmark.name.toLowerCase().indexOf(word) !== -1)
+				);
+				return filtered;
+			},
+			search() {
+				if(this.query) window.open(encodeURI((this.site || this.defaults.site) + this.query));
+			},
+			jsonFlat(src, trg, keys, children, name) {
+				let node = {};
+				while(src.length !== 0) {
+					node = src.shift();
+					if(children in node) {
+						for(var j = 0, jj = node[children].length; j < jj; j++) {
+							node[children][j].tag = node[name];
+							src.push(node[children][j]);
+						}
+						keys.push(node[name]);
+					}
+					else trg.push(node);
+				}
+			},
+			jsonPath(data, path) {
+				for(let i = 0, ii = path.length; i < ii; i++) data = data[path[i]];
+				return data;
+			},
+			initData(data, options) {
+				let mainData = this.jsonPath(data, options.main.split('.'))[options.children];
+				const searchIndex = options.search ? mainData.findIndex(item => item[options.name] === options.search) : -1;
+				if(searchIndex !== -1) this.sites = mainData.splice(searchIndex, 1)[0][options.children];
+				this.jsonFlat(mainData, this.bookmarks, this.tags, options.children, options.name);
+				if(options.sort) this.bookmarks.sort(function(a, b) {
+					return a[options.sort] < b[options.sort] ? 1 : -1;
+				});
+			},
+			init() {
+				fetch(this.defaults.path).then((response) => {
+					return response.json();
+				}).then((body) => {
+					this.initData(body, this.defaults.data);
+				});
+			}
+		}));
+		Alpine.start();
+	</script>
+</body>
+</html>
