@@ -15,7 +15,8 @@
 					<option value="">All</option>
 					<option v-text="tag" v-for="(tag, index) in tags" :key="index" :value="tag"></option>
 				</select>
-				<input v-model="query" type="search" class="form-control" placeholder="Search">
+				<!-- https://github.com/vuejs/vue/issues/9299#issuecomment-636338180 -->
+				<input :value="query" @input="query=$event.target.value" type="search" class="form-control" placeholder="Search">
 				<select v-model="site" @change="search" class="form-control">
 					<option value="">Google</option>
 					<option v-for="site in sites" v-text="site.name" :key="site.id" :value="site.url"></option>
