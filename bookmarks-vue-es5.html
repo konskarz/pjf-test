@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zxx">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Bookmarks Vue ES5</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css" />
+</head>
+<body>
+	<div id="bookmarks" class="container vh-100 d-flex flex-column">
+		<div class="py-4 row flex-shrink-0">
+			<h2 class="h3 font-weight-light mb-0 pt-3 col-sm-4 col-md-7">Bookmarks</h2>
+			<form @submit.prevent="search" class="col pt-3 input-group">
+				<select v-model="tag" class="form-control">
+					<option value="">All</option>
+					<option v-text="tag" v-for="(tag, index) in tags" :key="index" :value="tag"></option>
+				</select>
+				<!-- https://github.com/vuejs/vue/issues/9299#issuecomment-636338180 -->
+				<input :value="query" @input="query=$event.target.value" type="search" class="form-control" placeholder="Search">
+				<select v-model="site" @change="search" class="form-control">
+					<option value="">Google</option>
+					<option v-for="site in sites" v-text="site.name" :key="site.id" :value="site.url"></option>
+				</select>
+			</form>
+		</div>
+		<div class="section-content pb-4 row flex-nowrap overflow-auto">
+			<div class="nav flex-column col-10 col-md-7 px-0">
+				<a v-for="bookmark in filtered" v-text="bookmark.name" :key="bookmark.id" :href="bookmark.url"
+					class="nav-link w-100 text-truncate" rel="external"></a>
+			</div>
+		</div>
+	</div>
+	<script src="https://cdn.jsdelivr.net/npm/vue@2.7.8/dist/vue.min.js"></script>
+	<script>
+		new Vue({
+			el: '#bookmarks',
+			data: {
+				defaults: {
+					'path': './Bookmarks',
+					'data': {
+						'main': 'roots.other',
+						'search': 'Search',
+						'children': 'children',
+						'name': 'name',
+						'url': 'url',
+						'sort': 'date_added'
+					},
+					'site': 'https://google.com/search?q='
+				},
+				bookmarks: [],
+				tags: [],
+				sites: [],
+				query: '',
+				tag: '',
+				site: '',
+			},
+			computed: {
+				filtered: function() {
+					var filtered = this.bookmarks, tag = this.tag;
+					if(tag) filtered = filtered.filter(function(bookmark) {
+						return bookmark.tag === tag;
+					});
+					if(this.query) this.query.toLowerCase().split(/\s|\+/g).forEach(function(word) {
+						filtered = filtered.filter(function(bookmark) {
+							return bookmark.name.toLowerCase().indexOf(word) !== -1;
+						});
+					});
+					return filtered;
+				}
+			},
+			methods: {
+				search: function() {
+					if(this.query) window.open(encodeURI((this.site || this.defaults.site) + this.query));
+				},
+				jsonPath: function(data, path) {
+					for(var i = 0, ii = path.length; i < ii; i++) data = data[path[i]];
+					return data;
+				},
+				findIndex: function(array, key, value) {
+					for(var i = 0, ii = array.length; i < ii; i++) if(array[i][key] === value) return i;
+					return -1;
+				},
+				flatData: function(src, children, name) {
+					var trg = {data: [], tags: []}, node = {};
+					while(src.length !== 0) {
+						node = src.shift();
+						if(children in node) {
+							for(var i = 0, ii = node[children].length; i < ii; i++) {
+								node[children][i].tag = node[name];
+								src.push(node[children][i]);
+							}
+							trg.tags.push(node[name]);
+						}
+						else trg.data.push(node);
+					}
+					return trg;
+				},
+				initData: function(data, options) {
+					var mainData = this.jsonPath(data, options.main.split('.'))[options.children],
+						searchIndex = options.search ? this.findIndex(mainData, options.name, options.search) : -1;
+					if(searchIndex !== -1) this.sites = mainData.splice(searchIndex, 1)[0][options.children];
+					var flat = this.flatData(mainData, options.children, options.name);
+					if(options.sort) flat.data.sort(function(a, b) {
+						return a[options.sort] < b[options.sort] ? 1 : -1;
+					});
+					this.bookmarks = flat.data;
+					this.tags = flat.tags;
+				}
+			},
+			created: function() {
+				var self = this, xhr = new XMLHttpRequest();
+				xhr.open('GET', this.defaults.path || '/');
+				if('overrideMimeType' in xhr) xhr.overrideMimeType('text/plain');
+				xhr.addEventListener('load', function() {
+					self.initData(JSON.parse(this.response), self.defaults.data);
+				});
+				xhr.send();
+			}
+		});
+	</script>
+</body>
+</html>
